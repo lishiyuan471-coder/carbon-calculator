@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>道路全生命周期碳排放计算器</title>
+    <style>
+        :root {
+            --primary: #0ea5e9;
+            --primary-dark: #0284c7;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+            --shadow: 0 4px 20px rgba(0,0,0,0.08);
+            --radius: 12px;
+            --transition: all 0.2s ease;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #f0f9ff 0%, #f8fafc 100%);
+            min-height: 100vh;
+            padding: 24px;
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        .main-container {
+            display: flex;
+            gap: 24px;
+            max-width: 1440px;
+            margin: 0 auto;
+            flex-wrap: wrap;
+            align-items: flex-start;
+        }
+
+        /* 左侧控制面板 */
+        .left-panel {
+            flex: 1 1 520px;
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            padding: 28px 24px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            max-height: calc(100vh - 48px);
+            overflow-y: auto;
+            transition: var(--transition);
+        }
+
+        /* 右侧结果面板 */
+        .right-panel {
+            flex: 1.2 1 600px;
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            padding: 28px 24px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            max-height: calc(100vh - 48px);
+            overflow-y: auto;
+            transition: var(--transition);
+        }
+
+        /* 标题样式 */
+        .section-title {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--text);
+            margin: 24px 0 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .section-title::before {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 18px;
+            background: var(--primary);
+            border-radius: 3px;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 8px 0 16px;
+        }
+
+        .radio-group label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: #f1f5f9;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-weight: 500;
+            font-size: 14px;
+            border: 1px solid transparent;
+        }
+        .radio-group label:hover {
+            background: #e0f2fe;
+            border-color: #bae6fd;
+        }
+        .radio-group input[type="radio"] {
+            accent-color: var(--primary);
+            width: 16px;
+            height: 16px;
+        }
+        .radio-group input[type="radio"]:checked + span {
+            color: var(--primary-dark);
+        }
+
+        /* 结构层选择行 */
+        .layer-row {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            gap: 12px;
+        }
+        .layer-row label {
+            min-width: 70px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        .layer-row select {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: white;
+            font-size: 14px;
+            transition: var(--transition);
+            appearance: none;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%23475569" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>');
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            cursor: pointer;
+        }
+        .layer-row select:hover {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(14,165,233,0.1);
+        }
+
+        /* 参数设置网格 */
+        .params-grid {
+            display: grid;
+            grid-template-columns: 140px 1fr;
+            gap: 12px 16px;
+            align-items: center;
+            margin: 12px 0;
+        }
+        .params-grid span {
+            font-weight: 500;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        .params-grid select {
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+
+        /* 养护表格 */
+        .maint-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            background: #f8fafc;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .maint-table th {
+            background: #f1f5f9;
+            padding: 10px 12px;
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        .maint-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+        .maint-table input[type="number"] {
+            width: 70px;
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        /* 运营方案卡片 */
+        .op-card {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 12px 0;
+            border: 1px solid var(--border);
+        }
+        .op-sub {
+            margin-left: 24px;
+            margin-top: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .op-sub label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 16px 0;
+        }
+
+        /* 按钮样式 */
+        .btn-calc {
+            background: linear-gradient(135deg, var(--primary), #0284c7);
+            color: white;
+            border: none;
+            padding: 12px 36px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 24px 0 8px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 14px rgba(14,165,233,0.4);
+            letter-spacing: 0.5px;
+        }
+        .btn-calc:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(14,165,233,0.5);
+        }
+        .btn-calc:active {
+            transform: translateY(0);
+        }
+
+        /* 结果表格 */
+        .result-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 12px 0 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+        .result-table th {
+            background: #0ea5e9;
+            color: white;
+            padding: 12px 14px;
+            font-weight: 600;
+            font-size: 13px;
+            text-align: left;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .result-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 14px;
+            background: white;
+        }
+        .result-table tr:last-child td {
+            border-bottom: none;
+            font-weight: 700;
+            background: #f0f9ff;
+        }
+        .result-table tr:hover td {
+            background: #f8fafc;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-green { background: #dcfce7; color: #166534; }
+        .badge-red { background: #fee2e2; color: #991b1b; }
+
+        /* 自定义滚动条 */
+        .left-panel::-webkit-scrollbar,
+        .right-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+        .left-panel::-webkit-scrollbar-track,
+        .right-panel::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 10px;
+        }
+        .left-panel::-webkit-scrollbar-thumb,
+        .right-panel::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        @media (max-width: 900px) {
+            .main-container {
+                flex-direction: column;
+            }
+            .left-panel, .right-panel {
+                max-height: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- 左侧控制面板 -->
+        <div class="left-panel">
+            <div class="section-title">一、选择道路类型</div>
+            <div class="radio-group" id="roadTypeGroup">
+                <label><input type="radio" name="roadType" value="main" checked> 主干道</label>
+                <label><input type="radio" name="roadType" value="sub"> 次干道</label>
+                <label><input type="radio" name="roadType" value="sidewalk"> 人行道</label>
+            </div>
+
+            <div class="section-title">二、各结构层方案选择</div>
+            <div id="layerContainer"></div>
+
+            <div class="section-title">三、施工方式 / 报废拆除比例</div>
+            <div class="params-grid">
+                <span>主体施工方式</span>
+                <select id="buildType">
+                    <option value="传统">传统施工</option>
+                    <option value="新能源">新能源施工</option>
+                </select>
+                <span>报废拆除比例</span>
+                <select id="demolishRatio">
+                    <option value="0%">0%</option>
+                    <option value="30%">30%</option>
+                    <option value="40%">40%</option>
+                    <option value="50%">50%</option>
+                    <option value="60%">60%</option>
+                </select>
+                <span>智能摊铺节约比例</span>
+                <select id="compactionRatio">
+                    <option value="0%">0%</option>
+                    <option value="20%">20%</option>
+                    <option value="25%">25%</option>
+                    <option value="30%">30%</option>
+                </select>
+            </div>
+
+            <div class="section-title">四、养护方案</div>
+            <div id="maintenanceContainer">
+                <table class="maint-table">
+                    <thead><tr><th>养护方案</th><th>施工方式</th><th>养护次数</th></tr></thead>
+                    <tbody id="maintBody"></tbody>
+                </table>
+            </div>
+
+            <div class="section-title">五、运营方案（主干道/次干道）</div>
+            <div id="operationContainer" class="op-card">
+                <!-- 动态生成 -->
+            </div>
+
+            <button class="btn-calc" id="calcBtn">⚡ 开始计算碳排放</button>
+        </div>
+
+        <!-- 右侧结果面板 -->
+        <div class="right-panel" id="resultPanel">
+            <div style="text-align: center; color: #94a3b8; margin-top: 40px; font-size: 15px;">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5'%3E%3Cpath d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'%3E%3C/path%3E%3C/svg%3E" style="opacity:0.5;"/><br>
+                请选择参数后点击计算
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===================== 与原始版本完全一致的数据和逻辑 =====================
+        (function() {
+            // 数据定义（与Python完全匹配）
+            const roadDataMain = [
+                ["主干道", "路基", "碎石", 2082.99, 0, 11179.35, 188.447773, 188.447773, 188.447773, 188.447773, 180.459349, 180.459349, 180.459349, 180.459349, 0, 0, 0, 0, 0],
+                ["主干道", "路基", "替代：工程渣土（92.5%）", 1627.620642, 0, 1353.078018, 188.447773, 188.447773, 188.447773, 188.447773, 180.459349, 180.459349, 180.459349, 180.459349, 0, 0, 0, 0, 0],
+                ["主干道", "上面层", "细粒式沥青混凝土 SMA-13（热拌）", 5031.793686, 8970.323, 3613.164057, 292.607439, 284.000851, 281.849204, 279.697556, 234.70731, 227.340715, 225.499066, 223.657418, 0, -1509.538106, -2012.717474, -2515.896843, -3019.076211],
+                ["主干道", "上面层", "替代：细粒式沥青混凝土 SMA-13（温拌）-表面活性沥青发泡", 5008.121091, 6467.662, 3613.164057, 292.607439, 284.000851, 281.849204, 279.697556, 234.70731, 227.340715, 225.499066, 223.657418, 0, -1502.436327, -2003.248436, -2504.060545, -3004.872655],
+                ["主干道", "上面层", "替代：细粒式沥青混凝土 SMA-13（温拌）-表面活性剂", 5148.874824, 6461.662, 3613.164057, 292.607439, 284.000851, 281.849204, 279.697556, 234.70731, 227.340715, 225.499066, 223.657418, 0, -1544.662447, -2059.54993, -2574.437412, -3089.324894],
+                ["主干道", "上面层", "替代：细粒式沥青混凝土 SMA-13（40%钢渣）", 4594.812536, 9015.348, 3135.086976, 292.607439, 284.000851, 281.849204, 279.697556, 234.70731, 227.340715, 225.499066, 223.657418, 0, -1378.443761, -1837.925015, -2297.406268, -2756.887522],
+                ["主干道", "中面层", "中粒式沥青混凝土 AC-20(热拌)", 4468.38556, 12317.078, 5578.804273, 436.12459, 423.302529, 420.097014, 416.891499, 349.844262, 338.869539, 336.125858, 333.382177, 0, -1340.515668, -1787.354224, -2234.19278, -2681.031336],
+                ["主干道", "中面层", "中粒式沥青混凝土 AC-20（温拌）-表面活性沥青发泡", 4513.146374, 9802.417, 5578.804273, 436.12459, 423.302529, 420.097014, 416.891499, 349.844262, 338.869539, 336.125858, 333.382177, 0, -1353.943912, -1805.25855, -2256.573187, -2707.887824],
+                ["主干道", "中面层", "中粒式沥青混凝土 AC-20（温拌）-表面活性剂", 4642.779853, 9808.417, 5578.804273, 436.12459, 423.302529, 420.097014, 416.891499, 349.844262, 338.869539, 336.125858, 333.382177, 0, -1392.833956, -1857.111941, -2321.389927, -2785.667912],
+                ["主干道", "中面层", "替代：中粒式沥青混凝土 AC-20（30%RAP）", 3534.084022, 12272.053, 4975, 436.12459, 423.302529, 420.097014, 416.891499, 349.844262, 338.869539, 336.125858, 333.382177, 0, -1060.225207, -1413.633609, -1767.042011, -2120.450413],
+                ["主干道", "中面层", "替代：中粒式沥青混凝土 AC-20（40%RAP）", 3178.899699, 12224, 4865.16, 436.12459, 423.302529, 420.097014, 416.891499, 349.844262, 338.869539, 336.125858, 333.382177, 0, -953.66991, -1271.559879, -1589.449849, -1907.339819],
+                ["主干道", "中面层", "替代：中粒式沥青混凝土 AC-20（50%RAP）", 2888.589224, 12185, 4775.38, 436.12459, 423.302529, 420.097014, 416.891499, 349.844262, 338.869539, 336.125858, 333.382177, 0, -866.5767671, -1155.43569, -1444.294612, -1733.153534],
+                ["主干道", "中面层", "替代：中粒式沥青混凝土 AC-20（60%RAP）", 2646.866276, 12150, 4700.62, 436.12459, 423.302529, 420.097014, 416.891499, 349.844262, 338.869539, 336.125858, 333.382177, 0, -794.0598829, -1058.74651, -1323.433138, -1588.119766],
+                ["主干道", "下面层", "粗粒式沥青混凝土 AC-25（热拌）", 7170.622779, 15807.858, 7374.045385, 577.784028, 560.805044, 556.560298, 552.315552, 463.503412, 448.970674, 445.337489, 441.704305, 0, -2151.186834, -2868.249112, -3585.31139, -4302.373668],
+                ["主干道", "下面层", "粗粒式沥青混凝土 AC-25（温拌）-表面活性沥青发泡", 7196.10515, 12259.053, 7374.045385, 577.784028, 560.805044, 556.560298, 552.315552, 463.503412, 448.970674, 445.337489, 441.704305, 0, -2158.831545, -2878.44206, -3598.052575, -4317.66309],
+                ["主干道", "下面层", "粗粒式沥青混凝土 AC-25（温拌）-表面活性剂", 7401.033104, 12270.053, 7374.045385, 577.784028, 560.805044, 556.560298, 552.315552, 463.503412, 448.970674, 445.337489, 441.704305, 0, -2220.309931, -2960.413242, -3700.516552, -4440.619862],
+                ["主干道", "下面层", "替代：粗粒式沥青混凝土 AC-25（30%RAP）", 4597.97, 15413, 6652.93, 577.784028, 560.805044, 556.560298, 552.315552, 463.503412, 448.970674, 445.337489, 441.704305, 0, -1379.391, -1839.188, -2298.985, -2758.782],
+                ["主干道", "下面层", "替代：粗粒式沥青混凝土 AC-25（40%RAP）", 4135.86, 15348, 6506.04, 577.784028, 560.805044, 556.560298, 552.315552, 463.503412, 448.970674, 445.337489, 441.704305, 0, -1240.758, -1654.344, -2067.93, -2481.516],
+                ["主干道", "下面层", "替代：粗粒式沥青混凝土 AC-25（50%RAP）", 3758.15, 15295, 6385.98, 577.784028, 560.805044, 556.560298, 552.315552, 463.503412, 448.970674, 445.337489, 441.704305, 0, -1127.445, -1503.26, -1879.075, -2254.89],
+                ["主干道", "下面层", "替代：粗粒式沥青混凝土 AC-25（60%RAP）", 3443.66, 15248, 6286.01, 577.784028, 560.805044, 556.560298, 552.315552, 463.503412, 448.970674, 445.337489, 441.704305, 0, -1033.098, -1377.464, -1721.83, -2066.196],
+                ["主干道", "基层", "水泥稳定碎石", 2272312.784, 0, 29173.2, 241.904555, 241.904555, 241.904555, 241.904555, 235.505469, 235.505469, 235.505469, 235.505469, 0, 0, 0, 0, 0]
+            ];
+            const roadDataSub = [
+                ["次干道", "路基", "碎石", 2082.99, 0, 11179.35, 188.447773, 188.447773, 188.447773, 188.447773, 180.459349, 180.459349, 180.459349, 180.459349, 0, 0, 0, 0, 0],
+                ["次干道", "路基", "替代：工程渣土（92.5%）", 1627.62, 0, 1353.08, 188.447773, 188.447773, 188.447773, 188.447773, 180.459349, 180.459349, 180.459349, 180.459349, 0, 0, 0, 0, 0],
+                ["次干道", "上面层", "细粒式沥青混凝土 SMA-13（热拌）", 5031.79, 8970.323, 3613.16, 292.607439, 284.000851, 281.849204, 279.697556, 234.70731, 227.340715, 225.499066, 223.657418, 0, -1509.537, -2012.716, -2515.895, -3019.074],
+                ["次干道", "上面层", "替代：细粒式沥青混凝土 SMA-13（温拌）-表面活性沥青发泡", 5008.121091, 6467.662, 3613.164057, 292.607439, 284.000851, 281.849204, 279.697556, 234.70731, 227.340715, 225.499066, 223.657418, 0, -1502.436327, -2003.248436, -2504.060545, -3004.872655],
+                ["次干道", "上面层", "替代：细粒式沥青混凝土 SMA-13（温拌）-表面活性剂", 5148.874824, 6461.662, 3613.164057, 292.607439, 284.000851, 281.849204, 279.697556, 234.70731, 227.340715, 225.499066, 223.657418, 0, -1544.662447, -2059.54993, -2574.437412, -3089.324894],
+                ["次干道", "上面层", "替代：细粒式沥青混凝土 SMA-13（40%钢渣）", 4594.81, 9015.35, 3135.09, 292.607439, 284.000851, 281.849204, 279.697556, 234.70731, 227.340715, 225.499066, 223.657418, 0, -1378.443, -1837.924, -2297.405, -2756.886],
+                ["次干道", "下面层", "粗粒式沥青混凝土 AC-25（热拌）", 7170.62, 15807.86, 7374.05, 577.784028, 560.805044, 556.560298, 552.315552, 463.503412, 448.970674, 445.337489, 441.704305, 0, -2151.186, -2868.248, -3585.31, -4302.372],
+                ["次干道", "下面层", "粗粒式沥青混凝土 AC-25（温拌）-表面活性沥青发泡", 7196.10515, 12259.053, 7374.045385, 577.784028, 560.805044, 556.560298, 552.315552, 463.503412, 448.970674, 445.337489, 441.704305, 0, -2158.831545, -2878.44206, -3598.052575, -4317.66309],
+                ["次干道", "下面层", "粗粒式沥青混凝土 AC-25（温拌）-表面活性剂", 7401.033104, 12270.053, 7374.045385, 577.784028, 560.805044, 556.560298, 552.315552, 463.503412, 448.970674, 445.337489, 441.704305, 0, -2220.309931, -2960.413242, -3700.516552, -4440.619862],
+                ["次干道", "下面层", "替代：粗粒式沥青混凝土 AC-25（30%RAP）", 4597.97, 15413, 6652.93, 577.784028, 560.805044, 556.560298, 552.315552, 463.503412, 448.970674, 445.337489, 441.704305, 0, -1379.391, -1839.188, -2298.985, -2758.782],
+                ["次干道", "下面层", "替代：粗粒式沥青混凝土 AC-25（40%RAP）", 4135.86, 15348, 6506.04, 577.784028, 560.805044, 556.560298, 552.315552, 463.503412, 448.970674, 445.337489, 441.704305, 0, -1240.758, -1654.344, -2067.93, -2481.516],
+                ["次干道", "下面层", "替代：粗粒式沥青混凝土 AC-25（50%RAP）", 3758.15, 15295, 6385.98, 577.784028, 560.805044, 556.560298, 552.315552, 463.503412, 448.970674, 445.337489, 441.704305, 0, -1127.445, -1503.26, -1879.075, -2254.89],
+                ["次干道", "下面层", "替代：粗粒式沥青混凝土 AC-25（60%RAP）", 3443.66, 15248, 6286.01, 577.784028, 560.805044, 556.560298, 552.315552, 463.503412, 448.970674, 445.337489, 441.704305, 0, -1033.098, -1377.464, -1721.83, -2066.196],
+                ["次干道", "基层", "水泥稳定碎石", 2045081.51, 0, 26255.88, 241.904555, 241.904555, 241.904555, 241.904555, 235.505469, 235.505469, 235.505469, 235.505469, 0, 0, 0, 0, 0]
+            ];
+            const roadDataSidewalk = [
+                ["人行道道路", "路基", "级配碎石", 793.52, 0, 18236.4, 107.684442, 107.684442, 107.684442, 107.684442, 103.119628, 103.119628, 103.119628, 103.119628, 0, 0, 0, 0, 0],
+                ["人行道道路", "基层", "水泥稳定碎石", 486924.168, 0, 12444.84, 138.231174, 138.231174, 138.231174, 138.231174, 134.574554, 134.574554, 134.574554, 134.574554, 0, 0, 0, 0, 0],
+                ["人行道道路", "面层", "细粒式沥青混凝土AC-13", 5514.145071, 0, 3281.996436, 167.204251, 167.204251, 167.204251, 167.204251, 134.118463, 134.118463, 134.118463, 134.118463, 0, 0, 0, 0, 0],
+                ["人行道道路", "面层", "替代：生物固碳混合料（30%木材）", 2749.513287, 0, 6401.386637, 167.204251, 167.204251, 167.204251, 167.204251, 134.118463, 134.118463, 134.118463, 134.118463, 0, 0, 0, 0, 0]
+            ];
+            const maintenanceData = [
+                ["预防性", "微表处", 4398.86622, 0, 904.26525, 73.15185981, 58.676827505625],
+                ["预防性", "超薄磨耗层", 2968.904157, 0, 2003.374286, 146.3037196, 117.35365501125],
+                ["应急性", "就地热再生", 3522.25558, 0, 2529.21484, 402.378709, 344.47858],
+                ["应急性", "加铺SMA13", 5031.793686, 0, 3613.164057, 292.6074392, 234.7073100225]
+            ];
+            const maintenanceDataSidewalk = [
+                ["预防性", "微表处", 2513.63784, 0, 516.723, 55.73475, 44.706154],
+                ["预防性", "超薄磨耗层", 1799.70685, 0, 1214.416577, 111.469501, 89.412309],
+                ["应急性", "加铺SMA13", 5514.145071, 0, 6401.386637, 167.204251, 134.118463]
+            ];
+            const operationData = {
+                "主干道": {
+                    "光伏": {
+                        "光伏公交站台": -139430.42,
+                        "光伏智能路灯": -215681.44,
+                        "中央分隔带位置设置光伏板": {
+                            "比例5%": -217860.037163, "比例10%": -435720.074326, "比例15%": -653580.111489,
+                            "比例20%": -871440.148651, "比例25%": -1089300.185814, "比例30%": -1307160.222977,
+                            "比例35%": -1525020.26014, "比例40%": -1742880.297303
+                        }
+                    },
+                    "LED": { "1级LED": -1299.825, "2级LED": -1415.365, "3级LED": -1559.79 },
+                    "植树": {
+                        "乔木": { "香樟树": -10896.799776 },
+                        "灌木": {
+                            "金边黄杨球": -733.986643, "红花檵木球": -873.341223,
+                            "金边黄杨": -11205.506922, "红花檵木": -13911.817057, "红叶石楠": -25341.765313
+                        }
+                    }
+                },
+                "次干道": {
+                    "光伏": {
+                        "光伏公交站台": -94427.73,
+                        "光伏智能路灯": -146067.89,
+                        "中央分隔带位置设置光伏板": {
+                            "比例5%": -147543.328228, "比例10%": -295086.656456, "比例15%": -442629.984684,
+                            "比例20%": -590173.312912, "比例25%": -737716.64114, "比例30%": -885259.969369,
+                            "比例35%": -1032803.297597, "比例40%": -1180346.625825
+                        }
+                    },
+                    "LED": { "1级LED": -423.646667, "2级LED": -462.16, "3级LED": -539.186667 },
+                    "植树": {
+                        "乔木": { "香樟树": -4050.537073 },
+                        "灌木": {
+                            "金边黄杨球": -489.324429, "红花檵木球": -582.227482,
+                            "金边黄杨": -7470.337948, "红花檵木": -9274.544705, "红叶石楠": -16894.510208
+                        }
+                    }
+                }
+            };
+            const baseSchemesMain = { "路基": "碎石", "上面层": "细粒式沥青混凝土 SMA-13（热拌）", "中面层": "中粒式沥青混凝土 AC-20(热拌)", "下面层": "粗粒式沥青混凝土 AC-25（热拌）", "基层": "水泥稳定碎石" };
+            const baseSchemesSub = { "路基": "碎石", "上面层": "细粒式沥青混凝土 SMA-13（热拌）", "下面层": "粗粒式沥青混凝土 AC-25（热拌）", "基层": "水泥稳定碎石" };
+            const baseSchemesSidewalk = { "路基": "级配碎石", "基层": "水泥稳定碎石", "面层": "细粒式沥青混凝土AC-13" };
+
+            const COL = { ROAD_TYPE:0, LAYER:1, PLAN:2, RAW_MATERIAL:3, MIXING:4, TRANSPORT:5, CONST_TRAD_0:6, CONST_TRAD_20:7, CONST_TRAD_25:8, CONST_TRAD_30:9, CONST_NEW_0:10, CONST_NEW_20:11, CONST_NEW_25:12, CONST_NEW_30:13, DEMO_0:14, DEMO_30:15, DEMO_40:16, DEMO_50:17, DEMO_60:18 };
+            const CONSTRUCTION_BASE = "传统";
+            const DEMOLISH_EQUIP = 109.77127;
+
+            function findRow(df, layer, plan) { return df.find(r => r[COL.LAYER] === layer && r[COL.PLAN] === plan); }
+            function getConstructionValue(row, buildType, compactionRatio) {
+                const map = { "传统-0%":COL.CONST_TRAD_0, "传统-20%":COL.CONST_TRAD_20, "传统-25%":COL.CONST_TRAD_25, "传统-30%":COL.CONST_TRAD_30, "新能源-0%":COL.CONST_NEW_0, "新能源-20%":COL.CONST_NEW_20, "新能源-25%":COL.CONST_NEW_25, "新能源-30%":COL.CONST_NEW_30 };
+                return row[map[`${buildType}-${compactionRatio}`]] || 0;
+            }
+            function getDemolishValue(row, ratio) {
+                const map = { "0%":COL.DEMO_0, "30%":COL.DEMO_30, "40%":COL.DEMO_40, "50%":COL.DEMO_50, "60%":COL.DEMO_60 };
+                return row[map[ratio]] || 0;
+            }
+            function calcEmission(df, schemeDict, buildType, demolishRatio, compactionRatio) {
+                const stage = { "原材料生产":0, "拌和":0, "运输":0, "主体施工":0, "报废拆除":0 };
+                for (const [layer, plan] of Object.entries(schemeDict)) {
+                    const row = findRow(df, layer, plan);
+                    if (!row) continue;
+                    stage["原材料生产"] += row[COL.RAW_MATERIAL];
+                    stage["拌和"] += row[COL.MIXING];
+                    stage["运输"] += row[COL.TRANSPORT];
+                    stage["主体施工"] += getConstructionValue(row, buildType, compactionRatio);
+                    stage["报废拆除"] += getDemolishValue(row, demolishRatio);
+                }
+                stage["报废拆除"] += DEMOLISH_EQUIP;
+                const total = Object.values(stage).reduce((a,b)=>a+b,0);
+                return { stage, total };
+            }
+            function calcConstructionEmission(df, schemeDict, buildType, compactionRatio) {
+                let res = 0;
+                for (const [layer, plan] of Object.entries(schemeDict)) {
+                    const row = findRow(df, layer, plan);
+                    if (row) res += getConstructionValue(row, buildType, compactionRatio);
+                }
+                return res;
+            }
+
+            let currentRoadType = "main";
+            let currentDf = roadDataMain;
+            let currentMaintenance = maintenanceData;
+            let currentBaseScheme = baseSchemesMain;
+            let currentRoadName = "主干道";
+
+            function getCurrentData() {
+                if (currentRoadType === "main") return { df: roadDataMain, maintenance: maintenanceData, baseScheme: baseSchemesMain, roadName: "主干道", hasOperation: true };
+                if (currentRoadType === "sub") return { df: roadDataSub, maintenance: maintenanceData, baseScheme: baseSchemesSub, roadName: "次干道", hasOperation: true };
+                return { df: roadDataSidewalk, maintenance: maintenanceDataSidewalk, baseScheme: baseSchemesSidewalk, roadName: "人行道道路", hasOperation: false };
+            }
+
+            function updateUI() {
+                const data = getCurrentData();
+                currentDf = data.df; currentMaintenance = data.maintenance; currentBaseScheme = data.baseScheme; currentRoadName = data.roadName;
+                renderLayers(data.df);
+                renderMaintenance(data.maintenance);
+                renderOperation(data.hasOperation);
+                const demolishSelect = document.getElementById('demolishRatio');
+                const compactionSelect = document.getElementById('compactionRatio');
+                if (currentRoadType === 'sidewalk') {
+                    demolishSelect.value = "0%"; demolishSelect.disabled = true;
+                    compactionSelect.value = "0%"; compactionSelect.disabled = true;
+                } else {
+                    demolishSelect.disabled = false; compactionSelect.disabled = false;
+                }
+            }
+
+            function renderLayers(df) {
+                const container = document.getElementById('layerContainer');
+                container.innerHTML = '';
+                const layers = [...new Set(df.map(r=>r[COL.LAYER]))];
+                layers.forEach(layer => {
+                    const plans = df.filter(r=>r[COL.LAYER]===layer).map(r=>r[COL.PLAN]);
+                    const div = document.createElement('div');
+                    div.className = 'layer-row';
+                    div.innerHTML = `<label>${layer}</label><select class="layer-select" data-layer="${layer}">${plans.map(p=>`<option value="${p}">${p}</option>`).join('')}</select>`;
+                    container.appendChild(div);
+                });
+            }
+
+            function renderMaintenance(maintData) {
+                const tbody = document.getElementById('maintBody');
+                tbody.innerHTML = '';
+                maintData.forEach((item, idx) => {
+                    const name = item[1];
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td><label><input type="checkbox" class="maint-check" data-index="${idx}"> ${name}</label></td>
+                        <td><select class="maint-build"><option value="传统">传统施工</option><option value="新能源">新能源施工</option></select></td>
+                        <td><input type="number" class="maint-count" value="1" min="1"></td>`;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            function renderOperation(hasOperation) {
+                const container = document.getElementById('operationContainer');
+                if (!hasOperation) { container.innerHTML = '<p style="color:#64748b;">当前道路类型无运营方案</p>'; return; }
+                container.innerHTML = `
+                    <div><label style="font-weight:600;"><input type="checkbox" id="pvParent"> 光伏</label>
+                        <div class="op-sub">
+                            <label><input type="checkbox" class="pv-child" id="pvBus"> 光伏公交站台</label>
+                            <label><input type="checkbox" class="pv-child" id="pvLight"> 光伏智能路灯</label>
+                            <label><input type="checkbox" class="pv-child" id="pvDivider"> 中央分隔带位置设置光伏板</label>
+                            <select id="pvDividerRatio" disabled style="margin-left:24px;">
+                                <option value="比例5%">比例5%</option><option value="比例10%">比例10%</option><option value="比例15%">比例15%</option>
+                                <option value="比例20%">比例20%</option><option value="比例25%">比例25%</option><option value="比例30%">比例30%</option>
+                                <option value="比例35%">比例35%</option><option value="比例40%">比例40%</option>
+                            </select>
+                        </div>
+                    </div>
+                    <hr>
+                    <div><label style="font-weight:600;"><input type="checkbox" id="ledCheck"> LED</label>
+                        <select id="ledLevel" disabled style="margin-left:12px;">
+                            <option value="1级LED">1级LED</option><option value="2级LED">2级LED</option><option value="3级LED">3级LED</option>
+                        </select>
+                    </div>
+                    <hr>
+                    <div><label style="font-weight:600;"><input type="checkbox" id="treeCheck"> 植树</label>
+                        <div class="op-sub">
+                            <span>乔木：</span><select id="treeArbor" disabled><option value="香樟树">香樟树</option></select><br>
+                            <span>灌木：</span><select id="treeShrub" disabled>
+                                <option value="金边黄杨球">金边黄杨球</option><option value="红花檵木球">红花檵木球</option>
+                                <option value="金边黄杨">金边黄杨</option><option value="红花檵木">红花檵木</option><option value="红叶石楠">红叶石楠</option>
+                            </select>
+                        </div>
+                    </div>`;
+                bindOperationEvents();
+            }
+
+            function bindOperationEvents() {
+                const pvParent = document.getElementById('pvParent');
+                const pvChildren = document.querySelectorAll('.pv-child');
+                const pvDivider = document.getElementById('pvDivider');
+                const pvDividerRatio = document.getElementById('pvDividerRatio');
+                const ledCheck = document.getElementById('ledCheck');
+                const ledLevel = document.getElementById('ledLevel');
+                const treeCheck = document.getElementById('treeCheck');
+                const treeArbor = document.getElementById('treeArbor');
+                const treeShrub = document.getElementById('treeShrub');
+
+                function updatePvParentState() {
+                    const allChecked = Array.from(pvChildren).every(cb => cb.checked);
+                    const noneChecked = Array.from(pvChildren).every(cb => !cb.checked);
+                    pvParent.checked = allChecked;
+                    pvParent.indeterminate = !allChecked && !noneChecked;
+                }
+                pvParent.addEventListener('change', function() {
+                    pvChildren.forEach(cb => cb.checked = this.checked);
+                    pvDividerRatio.disabled = !pvDivider.checked;
+                    updatePvParentState();
+                });
+                pvChildren.forEach(cb => cb.addEventListener('change', function() {
+                    if (cb === pvDivider) pvDividerRatio.disabled = !cb.checked;
+                    updatePvParentState();
+                }));
+                ledCheck.addEventListener('change', () => ledLevel.disabled = !ledCheck.checked);
+                treeCheck.addEventListener('change', () => { treeArbor.disabled = !treeCheck.checked; treeShrub.disabled = !treeCheck.checked; });
+                updatePvParentState();
+            }
+
+            function calculate() {
+                const buildType = document.getElementById('buildType').value;
+                const demolishRatio = document.getElementById('demolishRatio').value;
+                const compactionRatio = document.getElementById('compactionRatio').value;
+                const userScheme = {};
+                document.querySelectorAll('.layer-select').forEach(sel => userScheme[sel.dataset.layer] = sel.value);
+
+                const baseDemolishRatio = "0%";
+                const userResult = calcEmission(currentDf, userScheme, buildType, demolishRatio, compactionRatio);
+                const baseResult = calcEmission(currentDf, currentBaseScheme, CONSTRUCTION_BASE, baseDemolishRatio, "0%");
+
+                const baseCon = calcConstructionEmission(currentDf, userScheme, CONSTRUCTION_BASE, "0%");
+                const nowCon = calcConstructionEmission(currentDf, userScheme, buildType, compactionRatio);
+                const reduceCon = baseCon - nowCon;
+                const rateCon = baseCon ? (reduceCon / baseCon * 100) : 0;
+
+                const maintChecks = document.querySelectorAll('.maint-check');
+                const maintBuilds = document.querySelectorAll('.maint-build');
+                const maintCounts = document.querySelectorAll('.maint-count');
+                const maintList = [];
+                let totalMaintenance = 0, baseTotalMaintenance = 0;
+                maintChecks.forEach((cb, idx) => {
+                    if (cb.checked) {
+                        const name = currentMaintenance[idx][1];
+                        const btype = maintBuilds[idx].value;
+                        let count = parseInt(maintCounts[idx].value) || 1;
+                        const row = currentMaintenance[idx];
+                        const singleEmi = row[2] + row[3] + row[4] + (btype==="传统"? row[5] : row[6]);
+                        const totalEmi = singleEmi * count;
+                        const baseSingleEmi = row[2] + row[3] + row[4] + row[5];
+                        const baseTotalEmi = baseSingleEmi * count;
+                        maintList.push({ name, btype, count, singleEmi, totalEmi, baseTotalEmi });
+                        totalMaintenance += totalEmi;
+                        baseTotalMaintenance += baseTotalEmi;
+                    }
+                });
+
+                const operationList = [];
+                let totalOperation = 0;
+                if (currentRoadType === 'main' || currentRoadType === 'sub') {
+                    const opData = operationData[currentRoadName];
+                    if (document.getElementById('pvBus')?.checked) { const e=opData["光伏"]["光伏公交站台"]; operationList.push({level1:"光伏",level2:"光伏公交站台",level3:"",emission:e}); totalOperation+=e; }
+                    if (document.getElementById('pvLight')?.checked) { const e=opData["光伏"]["光伏智能路灯"]; operationList.push({level1:"光伏",level2:"光伏智能路灯",level3:"",emission:e}); totalOperation+=e; }
+                    if (document.getElementById('pvDivider')?.checked) { const r=document.getElementById('pvDividerRatio').value; const e=opData["光伏"]["中央分隔带位置设置光伏板"][r]; operationList.push({level1:"光伏",level2:"中央分隔带位置设置光伏板",level3:r,emission:e}); totalOperation+=e; }
+                    if (document.getElementById('ledCheck')?.checked) { const l=document.getElementById('ledLevel').value; const e=opData["LED"][l]; operationList.push({level1:"LED",level2:l,level3:"",emission:e}); totalOperation+=e; }
+                    if (document.getElementById('treeCheck')?.checked) {
+                        const arborType = document.getElementById('treeArbor').value;
+                        const arborEmi = opData["植树"]["乔木"][arborType];
+                        operationList.push({level1:"植树",level2:"乔木",level3:arborType,emission:arborEmi}); totalOperation+=arborEmi;
+                        const shrubType = document.getElementById('treeShrub').value;
+                        const shrubEmi = opData["植树"]["灌木"][shrubType];
+                        operationList.push({level1:"植树",level2:"灌木",level3:shrubType,emission:shrubEmi}); totalOperation+=shrubEmi;
+                    }
+                }
+
+                const reduceAll = baseResult.total - userResult.total;
+                const totalReduce = reduceAll - totalOperation + (baseTotalMaintenance - totalMaintenance);
+                const totalBaseEmission = baseResult.total + baseTotalMaintenance;
+                const totalRate = totalBaseEmission ? (totalReduce / totalBaseEmission * 100) : 0;
+
+                renderResults(userResult, baseResult, baseCon, nowCon, reduceCon, rateCon, maintList, totalMaintenance, baseTotalMaintenance, operationList, totalOperation, totalReduce, totalRate);
+            }
+
+            function renderResults(userResult, baseResult, baseCon, nowCon, reduceCon, rateCon, maintList, totalMaintenance, baseTotalMaintenance, operationList, totalOperation, totalReduce, totalRate) {
+                const panel = document.getElementById('resultPanel');
+                const newTotal = userResult.stage["原材料生产"] + userResult.stage["拌和"] + userResult.stage["运输"] + userResult.stage["主体施工"] + totalMaintenance + userResult.stage["报废拆除"] + ((currentRoadType==='main'||currentRoadType==='sub')?totalOperation:0);
+
+                let html = `<div style="font-size:18px;font-weight:700;margin-bottom:16px;">${currentRoadName} 碳排放计算结果</div>`;
+                html += `<div class="section-title" style="margin-top:0;">一、各阶段碳排放</div><table class="result-table"><tr><th>排放阶段</th><th>碳排放(kg CO₂e)</th></tr>`;
+                for (const [stage,val] of Object.entries(userResult.stage)) {
+                    if (stage !== "报废拆除") html += `<tr><td>${stage}</td><td>${val.toFixed(2)}</td></tr>`;
+                }
+                if (currentRoadType==='main'||currentRoadType==='sub') html += `<tr><td>运营</td><td>${totalOperation.toFixed(2)}</td></tr>`;
+                html += `<tr><td>养护</td><td>${totalMaintenance.toFixed(2)}</td></tr>`;
+                html += `<tr><td>报废拆除</td><td>${userResult.stage["报废拆除"].toFixed(2)}</td></tr>`;
+                html += `<tr style="font-weight:700;"><td>道路工程合计</td><td>${newTotal.toFixed(2)}</td></tr></table>`;
+
+                if (maintList.length) {
+                    html += `<div class="section-title">二、已勾选养护碳排放</div><table class="result-table"><tr><th>养护方案</th><th>施工方式</th><th>次数</th><th>单次排放</th><th>总排放</th></tr>`;
+                    maintList.forEach(i => html += `<tr><td>${i.name}</td><td>${i.btype}施工</td><td>${i.count}</td><td>${i.singleEmi.toFixed(2)}</td><td>${i.totalEmi.toFixed(2)}</td></tr>`);
+                    html += `</table>`;
+                }
+
+                html += `<div class="section-title">三、施工方式减碳对比</div><table class="result-table"><tr><th>对比项</th><th>数值</th></tr>
+                    <tr><td>传统施工排放（0%）</td><td>${baseCon.toFixed(2)}</td></tr>
+                    <tr><td>当前施工排放（${document.getElementById('compactionRatio').value}）</td><td>${nowCon.toFixed(2)}</td></tr>
+                    <tr><td>施工减碳量</td><td>${reduceCon.toFixed(2)}</td></tr>
+                    <tr><td>施工减碳比例</td><td>${rateCon.toFixed(2)}%</td></tr></table>`;
+
+                if ((currentRoadType==='main'||currentRoadType==='sub') && operationList.length) {
+                    html += `<div class="section-title">四、已勾选运营方案碳排放</div><table class="result-table"><tr><th>一级</th><th>二级</th><th>三级</th><th>碳排放量</th></tr>`;
+                    operationList.forEach(i => html += `<tr><td>${i.level1}</td><td>${i.level2}</td><td>${i.level3}</td><td>${i.emission.toFixed(2)}</td></tr>`);
+                    html += `<tr style="font-weight:700;"><td colspan="3">汇总</td><td>${totalOperation.toFixed(2)}</td></tr></table>`;
+                }
+
+                html += `<div class="section-title">五、整体方案减碳对比</div><table class="result-table"><tr><th>阶段</th><th>减碳量</th><th>减碳比例</th></tr>`;
+                ["原材料生产","拌和","运输","主体施工"].forEach(s => {
+                    const diff = baseResult.stage[s] - userResult.stage[s];
+                    const rt = baseResult.stage[s] ? (diff/baseResult.stage[s]*100) : 0;
+                    html += `<tr><td>${s}</td><td>${diff.toFixed(2)}</td><td>${rt.toFixed(2)}%</td></tr>`;
+                });
+                if (currentRoadType==='main'||currentRoadType==='sub') html += `<tr><td>运营</td><td>${(-totalOperation).toFixed(2)}</td><td>-</td></tr>`;
+                const maintReduce = baseTotalMaintenance - totalMaintenance;
+                html += `<tr><td>养护</td><td>${maintReduce.toFixed(2)}</td><td>${baseTotalMaintenance ? (maintReduce/baseTotalMaintenance*100).toFixed(2)+'%' : '-'}</td></tr>`;
+                const demoDiff = baseResult.stage["报废拆除"] - userResult.stage["报废拆除"];
+                html += `<tr><td>报废拆除</td><td>${demoDiff.toFixed(2)}</td><td>${baseResult.stage["报废拆除"] ? (demoDiff/baseResult.stage["报废拆除"]*100).toFixed(2)+'%' : '-'}</td></tr>`;
+                html += `<tr style="font-weight:700;"><td>全局总计</td><td>${totalReduce.toFixed(2)}</td><td>${totalRate.toFixed(2)}%</td></tr></table>`;
+
+                panel.innerHTML = html;
+            }
+
+            document.querySelectorAll('input[name="roadType"]').forEach(radio => radio.addEventListener('change', function() {
+                currentRoadType = this.value; updateUI();
+            }));
+            document.getElementById('calcBtn').addEventListener('click', calculate);
+            updateUI();
+        })();
+    </script>
+</body>
+</html>
